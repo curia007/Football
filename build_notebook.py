@@ -228,7 +228,8 @@ import pandas as pd
 import numpy as np
 
 DATA_URL = "https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv"
-LOCAL_CACHE_PATH = "games.csv"
+DATA_DIR = "data" if os.path.exists("data") else os.path.join("..", "data")
+LOCAL_CACHE_PATH = os.path.join(DATA_DIR, "games.csv")
 
 # Configure SSL context to handle macOS certificate verification
 try:
@@ -304,8 +305,9 @@ if raw_df is None:
                 })
     raw_df = pd.DataFrame(sample_records)
 
-# Save local cache for subsequent fast/offline runs
+# Save local cache in data/ directory for subsequent fast/offline runs
 try:
+    os.makedirs(os.path.dirname(LOCAL_CACHE_PATH) if os.path.dirname(LOCAL_CACHE_PATH) else "data", exist_ok=True)
     raw_df.to_csv(LOCAL_CACHE_PATH, index=False)
 except Exception:
     pass

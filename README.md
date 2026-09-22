@@ -83,7 +83,7 @@ python main.py
 ```
 
 ### 2. Run the Full MLX Training Script
-Execute `nfl_prediction_mlx.py` for end-to-end data processing, feature engineering, model training, evaluation, and +EV betting backtests:
+Execute `nfl/nfl_prediction_mlx.py` for end-to-end data processing, feature engineering, model training, evaluation, and +EV betting backtests:
 
 ```bash
 python nfl_prediction_mlx.py

@@ -39,7 +39,10 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from displayfunction import display
+try:
+    from IPython.display import display
+except Exception:
+    display = print
 from scipy.stats import norm
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import (
@@ -190,7 +193,8 @@ import pandas as pd
 import numpy as np
 
 DATA_URL = "https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv"
-LOCAL_CACHE_PATH = "games.csv"
+DATA_DIR = "data" if os.path.exists("../data") else os.path.join("../..", "data")
+LOCAL_CACHE_PATH = os.path.join(DATA_DIR, "games.csv")
 
 # Configure SSL context to handle macOS certificate verification
 try:
@@ -225,7 +229,7 @@ if raw_df is None:
 
 # Strategy 3: Check local cached copy
 if raw_df is None:
-    for candidate in [LOCAL_CACHE_PATH, os.path.join("notebooks", LOCAL_CACHE_PATH), os.path.join("..", LOCAL_CACHE_PATH)]:
+    for candidate in [LOCAL_CACHE_PATH, os.path.join("../notebooks", LOCAL_CACHE_PATH), os.path.join("../..", LOCAL_CACHE_PATH)]:
         if os.path.exists(candidate):
             print(f"📁 Loading cached dataset from {candidate} ...")
             raw_df = pd.read_csv(candidate)
@@ -266,8 +270,9 @@ if raw_df is None:
                 })
     raw_df = pd.DataFrame(sample_records)
 
-# Save local cache for subsequent fast/offline runs
+# Save local cache in data/ directory for subsequent fast/offline runs
 try:
+    os.makedirs(os.path.dirname(LOCAL_CACHE_PATH) if os.path.dirname(LOCAL_CACHE_PATH) else "data", exist_ok=True)
     raw_df.to_csv(LOCAL_CACHE_PATH, index=False)
 except Exception:
     pass
