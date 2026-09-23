@@ -1,14 +1,14 @@
-# 🏈 NFL Game Outcome & Spread Prediction using Apple MLX
+# 🏈 Football Game Outcome & Spread Prediction using Apple MLX
 
-> **High-Performance NFL Quantitative Analytics & Betting Intelligence powered by Apple Silicon (MLX) and Vegas Closing Market Insights.**
+> **High-Performance Football Quantitative Analytics & Betting Intelligence powered by Apple Silicon (MLX) and Vegas Closing Market Insights for NFL and NCAA.**
 
 ---
 
 ## 📌 Overview
 
-Predicting NFL match outcomes and point spreads is one of the most challenging problems in quantitative sports analytics. Modern sports betting markets aggregate massive volumes of public and sharp information, making betting lines (spreads, moneylines, over/under totals) exceptionally efficient baselines.
+Predicting football match outcomes and point spreads is one of the most challenging problems in quantitative sports analytics. Modern sports betting markets aggregate massive volumes of public and sharp information, making betting lines (spreads, moneylines, over/under totals) exceptionally efficient baselines.
 
-This project implements an end-to-end Machine Learning pipeline utilizing **[Apple MLX](https://github.com/ml-explore/mlx)** (`mlx.core`, `mlx.nn`, `mlx.optimizers`) designed specifically for Apple Silicon (M-series unified memory architecture) with Metal acceleration. It blends market-implied probabilities, dynamic FiveThirtyEight-style Elo ratings, rolling team efficiency metrics, and deep neural networks to identify positive expected value ($+EV$) betting opportunities.
+This project implements an end-to-end Machine Learning pipeline utilizing **[Apple MLX](https://github.com/ml-explore/mlx)** (`mlx.core`, `mlx.nn`, `mlx.optimizers`) designed specifically for Apple Silicon (M-series unified memory architecture) with Metal acceleration. It blends market-implied probabilities, dynamic FiveThirtyEight-style Elo ratings, rolling team efficiency metrics, and deep neural networks to identify positive expected value ($+EV$) betting opportunities across NFL and NCAA football matchups.
 
 ---
 
@@ -20,7 +20,8 @@ This project implements an end-to-end Machine Learning pipeline utilizing **[App
 
 2. **Automated Betting & Match Data Ingestion**:
    - Ingests historical NFL game logs, scores, and closing betting lines (spreads, moneylines, over/under totals) from the **nflverse** open analytics consortium (1999–present).
-   - Robust caching and offline fallback mechanisms.
+   - Upcoming matchup extraction scripts to automatically parse schedules and betting lines (`get_next_matchups.py`).
+   - Robust caching and offline fallback mechanisms stored under `data/`.
 
 3. **Betting Mathematics & Advanced Feature Engineering**:
    - **De-vigging Odds**: Strips bookmaker juice (overround) to extract true consensus market win probabilities.
@@ -37,7 +38,11 @@ This project implements an end-to-end Machine Learning pipeline utilizing **[App
    - Out-of-sample evaluation vs. Vegas closing lines and Elo baselines (Accuracy, ROC AUC, Brier Score, Log Loss).
    - Real-money simulation using Flat Staking and Fractional Kelly Criterion bankroll growth tracking.
 
-6. **Interactive All-Teams Matchup Predictor**:
+6. **Upcoming Matchup Generation & Batch Predictions**:
+   - Automated generation of upcoming games and spreads in `data/next_matchups.csv` and `data/ncaa_next_matchups.csv`.
+   - Batch MLX neural network inference generating model-backed predictions and $+EV$ edges in `data/next_matchups_predictions.csv` and `data/ncaa_next_matchups_predictions.csv`.
+
+7. **Interactive Matchup Predictor**:
    - Real-time prediction tool (`predict_nfl_matchup`) to evaluate any matchup between any two NFL teams given current lines and moneylines.
 
 ---
@@ -46,12 +51,20 @@ This project implements an end-to-end Machine Learning pipeline utilizing **[App
 
 ```text
 ├── main.py                         # Standalone pipeline and CLI predictor
-├── nfl_prediction_mlx.py           # Full MLX pipeline script with Jupyter cell markers (# %%)
 ├── build_notebook.py               # Script to build the executable Jupyter notebook
+├── nfl/
+│   ├── nfl_prediction_mlx.py       # Full NFL MLX training & prediction pipeline
+│   └── get_next_matchups.py        # Fetch and parse upcoming NFL matchups & lines
+├── ncaa/                           # NCAA College Football analytics & predictions
 ├── notebooks/
 │   └── nfl_prediction_mlx.ipynb    # Rich interactive Jupyter Notebook with charts & outputs
 ├── data/
-│   └── games.csv                   # Historical NFL match & betting dataset (nflverse)
+│   ├── games.csv                   # Historical NFL match & betting dataset (nflverse)
+│   ├── next_matchups.csv           # Extracted upcoming NFL games and odds
+│   ├── next_matchups_predictions.csv # Model predictions & edge values for next NFL games
+│   ├── ncaa_next_games.csv         # Upcoming NCAA games schedule
+│   ├── ncaa_next_matchups.csv      # Upcoming NCAA matchups dataset
+│   └── ncaa_next_matchups_predictions.csv # NCAA model predictions & analysis
 ├── README.md                       # Project documentation
 └── LICENSE                         # License file
 ```
@@ -82,14 +95,21 @@ Execute `main.py` to test team normalization, inspect MLX device status, and run
 python main.py
 ```
 
-### 2. Run the Full MLX Training Script
-Execute `nfl/nfl_prediction_mlx.py` for end-to-end data processing, feature engineering, model training, evaluation, and +EV betting backtests:
+### 2. Fetch Next Matchups
+Extract upcoming NFL games, scheduled dates, and current betting lines:
 
 ```bash
-python nfl_prediction_mlx.py
+python nfl/get_next_matchups.py
 ```
 
-### 3. Open the Interactive Jupyter Notebook
+### 3. Run the Full MLX Training & Prediction Script
+Execute `nfl/nfl_prediction_mlx.py` for end-to-end data processing, feature engineering, model training, evaluation, +EV betting backtests, and export of upcoming game predictions:
+
+```bash
+python nfl/nfl_prediction_mlx.py
+```
+
+### 4. Open the Interactive Jupyter Notebook
 Open the notebook in JupyterLab, VS Code, or PyCharm:
 
 ```bash
@@ -141,7 +161,7 @@ predict_nfl_matchup(
 
 ```
                                ┌────────────────────────┐
-                               │  nflverse Data Ingest   │
+                               │ Football Data Ingest   │
                                │  (Games, Odds, Lines)  │
                                └───────────┬────────────┘
                                            │
@@ -168,8 +188,9 @@ predict_nfl_matchup(
                         └──────────────────┬──────────────────┘
                                            │
                                ┌───────────▼────────────┐
-                               │  Model Evaluation &    │
+                               │  Model Evaluation,     │
                                │  +EV Betting Backtest  │
+                               │  & Matchup Predictions │
                                └────────────────────────┘
 ```
 

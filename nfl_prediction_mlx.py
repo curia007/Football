@@ -1,65 +1,36 @@
-"""
-Script to generate and execute nfl_prediction_mlx.ipynb
-"""
-import nbformat as nbf
+# %% [markdown]
+# # 🏈 NFL Game Outcome & Spread Prediction using Apple MLX Framework
+# 
+# ### Powered by High-Performance MLX on Apple Silicon GPU & Vegas Betting Market Intelligence
+# 
+# ---
+# 
+# ## 📌 Executive Summary
+# Predicting the outcome of National Football League (NFL) games is one of the most challenging problems in quantitative sports analytics. Modern sports betting markets (e.g., Pinnacle, DraftKings, FanDuel) aggregate massive volumes of public and sharp information, making betting lines (point spreads, moneylines, over/under totals) exceptionally efficient baselines.
+# 
+# This notebook demonstrates an end-to-end Machine Learning pipeline utilizing **Apple MLX** (`mlx.core`, `mlx.nn`, `mlx.optimizers`) designed specifically for Apple Silicon (M-series GPUs) unified memory architecture.
+# 
+# ### Key Objectives & Highlights:
+# 1. **Comprehensive All-32 NFL Team Coverage**: Normalized tracking of all 32 active NFL franchises (AFC & NFC, all 8 divisions) across historical relocations (e.g., SD $\rightarrow$ LAC, STL $\rightarrow$ LA, OAK $\rightarrow$ LV).
+# 2. **Automated Betting & Match Data Retrieval**: Ingest comprehensive NFL game schedules, scores, and historical closing betting lines (moneylines, spreads, totals, weather, stadiums) from the **nflverse** open analytics consortium.
+# 3. **Betting Mathematics & Feature Engineering**:
+#    - De-vigging American odds to compute fair no-vig implied market probabilities.
+#    - Point spread to win probability conversion via Gaussian margin distributions.
+#    - Dynamic Elo Rating Engine with margin-of-victory and home-field advantage modeling.
+#    - Exponential/rolling team offensive scoring, defensive efficiency, and rest advantage differentials.
+# 4. **MLX Neural Network Architecture**:
+#    - Custom deep Multi-Layer Perceptron (MLP) built with `mlx.nn.Module`.
+#    - Hardware-accelerated training using Apple Silicon Metal backend, `value_and_grad`, and AdamW optimizer.
+# 5. **Betting Market Backtesting & +EV Simulation**:
+#    - Out-of-sample chronological backtesting (simulating real-world seasons).
+#    - Expected Value ($+EV$) calculation and Kelly Criterion bankroll growth simulation against historical closing moneylines.
+# 6. **Interactive All-Teams Matchup Predictor**:
+#    - Live prediction utility for any matchup between all 32 NFL teams with instant betting recommendations.
+# %% [markdown]
+# ## 1. ⚙️ Environment Setup & Apple MLX Verification
+# We import Apple MLX along with scientific and data processing libraries (`pandas`, `numpy`, `scipy`, `sklearn`, `matplotlib`, `seaborn`).
+# %%
 import os
-import sys
-
-def build_nfl_mlx_notebook():
-    nb = nbf.v4.new_notebook()
-    nb.metadata = {
-        "kernelspec": {
-            "display_name": "Python 3",
-            "language": "python",
-            "name": "python3"
-        },
-        "language_info": {
-            "name": "python",
-            "version": "3.12.7"
-        }
-    }
-
-    cells = []
-
-    # Markdown: Title and Introduction
-    cells.append(nbf.v4.new_markdown_cell(
-r"""# 🏈 NFL Game Outcome & Spread Prediction using Apple MLX Framework
-
-### Powered by High-Performance MLX on Apple Silicon GPU & Vegas Betting Market Intelligence
-
----
-
-## 📌 Executive Summary
-Predicting the outcome of National Football League (NFL) games is one of the most challenging problems in quantitative sports analytics. Modern sports betting markets (e.g., Pinnacle, DraftKings, FanDuel) aggregate massive volumes of public and sharp information, making betting lines (point spreads, moneylines, over/under totals) exceptionally efficient baselines.
-
-This notebook demonstrates an end-to-end Machine Learning pipeline utilizing **Apple MLX** (`mlx.core`, `mlx.nn`, `mlx.optimizers`) designed specifically for Apple Silicon (M-series GPUs) unified memory architecture.
-
-### Key Objectives & Highlights:
-1. **Comprehensive All-32 NFL Team Coverage**: Normalized tracking of all 32 active NFL franchises (AFC & NFC, all 8 divisions) across historical relocations (e.g., SD $\rightarrow$ LAC, STL $\rightarrow$ LA, OAK $\rightarrow$ LV).
-2. **Automated Betting & Match Data Retrieval**: Ingest comprehensive NFL game schedules, scores, and historical closing betting lines (moneylines, spreads, totals, weather, stadiums) from the **nflverse** open analytics consortium.
-3. **Betting Mathematics & Feature Engineering**:
-   - De-vigging American odds to compute fair no-vig implied market probabilities.
-   - Point spread to win probability conversion via Gaussian margin distributions.
-   - Dynamic Elo Rating Engine with margin-of-victory and home-field advantage modeling.
-   - Exponential/rolling team offensive scoring, defensive efficiency, and rest advantage differentials.
-4. **MLX Neural Network Architecture**:
-   - Custom deep Multi-Layer Perceptron (MLP) built with `mlx.nn.Module`.
-   - Hardware-accelerated training using Apple Silicon Metal backend, `value_and_grad`, and AdamW optimizer.
-5. **Betting Market Backtesting & +EV Simulation**:
-   - Out-of-sample chronological backtesting (simulating real-world seasons).
-   - Expected Value ($+EV$) calculation and Kelly Criterion bankroll growth simulation against historical closing moneylines.
-6. **Interactive All-Teams Matchup Predictor**:
-   - Live prediction utility for any matchup between all 32 NFL teams with instant betting recommendations."""
-    ))
-
-    # Cell 1: Environment & Imports
-    cells.append(nbf.v4.new_markdown_cell(
-r"""## 1. ⚙️ Environment Setup & Apple MLX Verification
-We import Apple MLX along with scientific and data processing libraries (`pandas`, `numpy`, `scipy`, `sklearn`, `matplotlib`, `seaborn`)."""
-    ))
-
-    cells.append(nbf.v4.new_code_cell(
-"""import os
 import time
 import math
 import ssl
@@ -68,6 +39,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from displayfunction import display
 from scipy.stats import norm
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import (
@@ -97,17 +69,12 @@ plt.rcParams['font.size'] = 11
 sample_arr = mx.array([1.0, 2.0, 3.0, 4.0])
 print(f"✅ MLX Framework Version: {mx.__version__}")
 print(f"✅ MLX Default Device: {mx.default_device()}")
-print(f"✅ Sample MLX Metal Computation: {sample_arr * 2.5}")"""
-    ))
-
-    # Cell 2: All 32 NFL Teams Registry
-    cells.append(nbf.v4.new_markdown_cell(
-r"""## 2. 🏛️ Complete 32-Team NFL Registry & Franchise Normalization
-We register all 32 active NFL franchises across the AFC and NFC conferences and 8 divisions, with seamless aliasing for historical franchise moves (e.g., `SD` $\rightarrow$ `LAC`, `STL` $\rightarrow$ `LA`, `OAK` $\rightarrow$ `LV`, `WSH` $\rightarrow$ `WAS`)."""
-    ))
-
-    cells.append(nbf.v4.new_code_cell(
-"""# Canonical 32 NFL Teams Registry
+print(f"✅ Sample MLX Metal Computation: {sample_arr * 2.5}")
+# %% [markdown]
+# ## 2. 🏛️ Complete 32-Team NFL Registry & Franchise Normalization
+# We register all 32 active NFL franchises across the AFC and NFC conferences and 8 divisions, with seamless aliasing for historical franchise moves (e.g., `SD` $\rightarrow$ `LAC`, `STL` $\rightarrow$ `LA`, `OAK` $\rightarrow$ `LV`, `WSH` $\rightarrow$ `WAS`).
+# %%
+# Canonical 32 NFL Teams Registry
 NFL_TEAMS = {
     # AFC East
     'BUF': {'name': 'Buffalo Bills', 'conference': 'AFC', 'division': 'East', 'city': 'Buffalo'},
@@ -162,7 +129,7 @@ TEAM_ALIASES = {
 }
 
 def normalize_team(team_str):
-    \"\"\"Normalizes team abbreviations and full names to canonical 3-letter codes.\"\"\"
+    """Normalizes team abbreviations and full names to canonical 3-letter codes."""
     if not isinstance(team_str, str):
         return team_str
     team_str = team_str.strip().upper()
@@ -209,17 +176,12 @@ EPOCHS = 40
 BATCH_SIZE = 64
 
 print(f"✅ Registered all {len(NFL_TEAMS)} NFL franchises across {teams_df['conference'].nunique()} Conferences and {teams_df['division'].nunique()} Divisions:")
-teams_df[['name', 'conference', 'division', 'city']].head(10)"""
-    ))
-
-    # Cell 3: Data Retrieval
-    cells.append(nbf.v4.new_markdown_cell(
-r"""## 3. 📥 Data Retrieval: Ingesting Historical NFL & Betting Market Data
-We retrieve data from the official **nflverse** repository, which compiles comprehensive NFL game logs, game outcomes, stadium conditions, weather, and closing betting market lines (moneylines, point spreads, totals) from 1999 through the current season."""
-    ))
-
-    cells.append(nbf.v4.new_code_cell(
-"""# Data source: nflverse games dataset
+teams_df[['name', 'conference', 'division', 'city']].head(10)
+# %% [markdown]
+# ## 3. 📥 Data Retrieval: Ingesting Historical NFL & Betting Market Data
+# We retrieve data from the official **nflverse** repository, which compiles comprehensive NFL game logs, game outcomes, stadium conditions, weather, and closing betting market lines (moneylines, point spreads, totals) from 1999 through the current season.
+# %%
+# Data source: nflverse games dataset
 import os
 import io
 import ssl
@@ -330,33 +292,28 @@ display_cols = [
     'away_score', 'home_score', 'spread_line', 'total_line',
     'away_moneyline', 'home_moneyline'
 ]
-raw_df[raw_df['season'] >= 2023][display_cols].head(10)"""
-    ))
-
-    # Cell 4: Betting Odds Mathematics & De-vigging
-    cells.append(nbf.v4.new_markdown_cell(
-r"""## 4. 📐 Betting Mathematics & Feature Engineering
-
-### 4.1 American Odds to Implied Win Probabilities
-In sports betting, American odds represent payout ratios:
-- **Negative Odds (e.g., $-200$)**: You must bet $\$200$ to win $\$100$.
-  $$\text{Implied Probability} = \frac{|\text{Odds}|}{|\text{Odds}| + 100}$$
-- **Positive Odds (e.g., $+170$)**: A $\$100$ bet wins $\$170$.
-  $$\text{Implied Probability} = \frac{100}{\text{Odds} + 100}$$
-
-### 4.2 De-vigging (Removing Bookmaker Juice)
-Bookmakers add an overround (juice/vig) so that the sum of implied probabilities exceeds $1.0$ (typically around $1.03 - 1.05$). We calculate the fair, no-vig market consensus probability by normalizing:
-$$P_{\text{fair}}(\text{Home}) = \frac{P_{\text{implied}}(\text{Home})}{P_{\text{implied}}(\text{Home}) + P_{\text{implied}}(\text{Away})}$$
-
-### 4.3 Spread-Implied Win Probability
-NFL score differentials closely follow a normal distribution with standard deviation $\sigma \approx 13.8$ points:
-$$P_{\text{spread}}(\text{Home Win}) = \Phi\left(\frac{\text{Spread Line}}{\sigma}\right)$$
-where $\Phi$ is the standard normal cumulative distribution function (CDF)."""
-    ))
-
-    cells.append(nbf.v4.new_code_cell(
-"""def american_to_implied_prob(odds):
-    \"\"\"Converts American odds into raw implied probability.\"\"\"
+raw_df[raw_df['season'] >= 2023][display_cols].head(10)
+# %% [markdown]
+# ## 4. 📐 Betting Mathematics & Feature Engineering
+# 
+# ### 4.1 American Odds to Implied Win Probabilities
+# In sports betting, American odds represent payout ratios:
+# - **Negative Odds (e.g., $-200$)**: You must bet $\$200$ to win $\$100$.
+#   $$\text{Implied Probability} = \frac{|\text{Odds}|}{|\text{Odds}| + 100}$$
+# - **Positive Odds (e.g., $+170$)**: A $\$100$ bet wins $\$170$.
+#   $$\text{Implied Probability} = \frac{100}{\text{Odds} + 100}$$
+# 
+# ### 4.2 De-vigging (Removing Bookmaker Juice)
+# Bookmakers add an overround (juice/vig) so that the sum of implied probabilities exceeds $1.0$ (typically around $1.03 - 1.05$). We calculate the fair, no-vig market consensus probability by normalizing:
+# $$P_{\text{fair}}(\text{Home}) = \frac{P_{\text{implied}}(\text{Home})}{P_{\text{implied}}(\text{Home}) + P_{\text{implied}}(\text{Away})}$$
+# 
+# ### 4.3 Spread-Implied Win Probability
+# NFL score differentials closely follow a normal distribution with standard deviation $\sigma \approx 13.8$ points:
+# $$P_{\text{spread}}(\text{Home Win}) = \Phi\left(\frac{\text{Spread Line}}{\sigma}\right)$$
+# where $\Phi$ is the standard normal cumulative distribution function (CDF).
+# %%
+def american_to_implied_prob(odds):
+    """Converts American odds into raw implied probability."""
     if pd.isna(odds):
         return np.nan
     if odds > 0:
@@ -366,7 +323,7 @@ where $\Phi$ is the standard normal cumulative distribution function (CDF)."""
     return 0.5
 
 def american_to_decimal(odds):
-    \"\"\"Converts American odds into decimal payout multiplier.\"\"\"
+    """Converts American odds into decimal payout multiplier."""
     if pd.isna(odds):
         return np.nan
     if odds > 0:
@@ -411,17 +368,12 @@ df['home_devigged_prob'] = df['home_raw_prob'] / sum_raw_prob
 df['away_devigged_prob'] = df['away_raw_prob'] / sum_raw_prob
 
 print(f"✅ Processed {len(df):,} games across all {df['home_team'].nunique()} NFL teams with betting features.")
-df[['season', 'week', 'home_team', 'away_team', 'spread_line', 'home_moneyline', 'home_devigged_prob', 'home_win']].head()"""
-    ))
-
-    # Cell 5: Elo and Rolling Performance Features
-    cells.append(nbf.v4.new_markdown_cell(
-r"""### 4.4 Dynamic Elo Rating Engine & Rolling Performance Metrics Across All Teams
-To ensure zero lookahead bias / data leakage, team strength ratings and rolling metrics are calculated **strictly using past games** prior to kickoff."""
-    ))
-
-    cells.append(nbf.v4.new_code_cell(
-"""# Build Elo Rating Tracker and Rolling Stats (strictly prior games)
+df[['season', 'week', 'home_team', 'away_team', 'spread_line', 'home_moneyline', 'home_devigged_prob', 'home_win']].head()
+# %% [markdown]
+# ### 4.4 Dynamic Elo Rating Engine & Rolling Performance Metrics Across All Teams
+# To ensure zero lookahead bias / data leakage, team strength ratings and rolling metrics are calculated **strictly using past games** prior to kickoff.
+# %%
+# Build Elo Rating Tracker and Rolling Stats (strictly prior games)
 team_history = {team: [] for team in NFL_TEAMS} # team -> list of prior game dicts
 elo_ratings = {team: 1500.0 for team in NFL_TEAMS} # team -> current Elo rating
 
@@ -517,17 +469,12 @@ df['div_game'] = df['div_game'].fillna(0).astype(np.float32)
 df['total_line'] = df['total_line'].fillna(44.0)
 
 print("✅ Feature engineering completed successfully for all 32 NFL teams!")
-df[['season', 'home_team', 'away_team', 'spread_line', 'home_devigged_prob', 'elo_diff', 'roll_diff_net', 'home_win']].tail()"""
-    ))
-
-    # Cell 6: All-32 Teams Power Rankings Table & Chart
-    cells.append(nbf.v4.new_markdown_cell(
-r"""## 5. 🏆 All 32 NFL Teams: Current Ratings & Power Rankings
-We inspect the latest computed Elo ratings, recent form, and power rankings across all 32 NFL franchises."""
-    ))
-
-    cells.append(nbf.v4.new_code_cell(
-"""# Build comprehensive All-32 NFL Teams Summary
+df[['season', 'home_team', 'away_team', 'spread_line', 'home_devigged_prob', 'elo_diff', 'roll_diff_net', 'home_win']].tail()
+# %% [markdown]
+# ## 5. 🏆 All 32 NFL Teams: Current Ratings & Power Rankings
+# We inspect the latest computed Elo ratings, recent form, and power rankings across all 32 NFL franchises.
+# %%
+# Build comprehensive All-32 NFL Teams Summary
 team_summary = []
 for abbr, info in NFL_TEAMS.items():
     current_elo = elo_ratings.get(abbr, 1500.0)
@@ -572,21 +519,16 @@ nfc_patch = mpatches.Patch(color='#d62728', label='NFC')
 plt.legend(handles=[afc_patch, nfc_patch], loc='lower right')
 
 plt.tight_layout()
-plt.show()"""
-    ))
-
-    # Cell 7: Exploratory Data Analysis & Visualizations
-    cells.append(nbf.v4.new_markdown_cell(
-r"""## 6. 📊 Exploratory Data Analysis: Market Efficiency & Dynamics
-
-Let's visualize:
-1. Historical Home Field Advantage win rate trends.
-2. Market Calibration: Vegas Implied Win Probability vs Actual Win Rate.
-3. Distribution of Point Spreads."""
-    ))
-
-    cells.append(nbf.v4.new_code_cell(
-"""fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+plt.show()
+# %% [markdown]
+# ## 6. 📊 Exploratory Data Analysis: Market Efficiency & Dynamics
+# 
+# Let's visualize:
+# 1. Historical Home Field Advantage win rate trends.
+# 2. Market Calibration: Vegas Implied Win Probability vs Actual Win Rate.
+# 3. Distribution of Point Spreads.
+# %%
+fig, axes = plt.subplots(1, 3, figsize=(18, 5))
 
 # 1. Home Win Rate by Season
 season_hwr = df.groupby('season')['home_win'].mean()
@@ -621,21 +563,16 @@ axes[2].set_ylabel('Game Frequency')
 axes[2].legend()
 
 plt.tight_layout()
-plt.show()"""
-    ))
-
-    # Cell 8: Dataset Splitting & MLX Preparation
-    cells.append(nbf.v4.new_markdown_cell(
-r"""## 7. ✂️ Chronological Train / Validation / Test Splitting
-
-In financial and sports betting modeling, **random cross-validation causes catastrophic data leakage**. We strictly use **chronological / walk-forward splitting**:
-- **Train Set**: Historical seasons (1999–2021)
-- **Validation Set**: Calibration seasons (2022–2023)
-- **Test Set (Out-of-Sample Backtest)**: Recent seasons (2024–2026)"""
-    ))
-
-    cells.append(nbf.v4.new_code_cell(
-"""FEATURE_COLS = [
+plt.show()
+# %% [markdown]
+# ## 7. ✂️ Chronological Train / Validation / Test Splitting
+# 
+# In financial and sports betting modeling, **random cross-validation causes catastrophic data leakage**. We strictly use **chronological / walk-forward splitting**:
+# - **Train Set**: Historical seasons (1999–2021)
+# - **Validation Set**: Calibration seasons (2022–2023)
+# - **Test Set (Out-of-Sample Backtest)**: Recent seasons (2024–2026)
+# %%
+FEATURE_COLS = [
     'spread_line',          # Vegas point spread
     'total_line',           # Over/Under game total
     'home_devigged_prob',   # Vegas de-vigged implied probability
@@ -682,22 +619,17 @@ X_val_np = scaler.transform(val_df[FEATURE_COLS].values)
 y_val_np = val_df['home_win'].values.reshape(-1, 1).astype(np.float32)
 
 X_test_np = scaler.transform(test_df[FEATURE_COLS].values)
-y_test_np = test_df['home_win'].values.reshape(-1, 1).astype(np.float32)"""
-    ))
-
-    # Cell 9: Building MLX Model Architecture
-    cells.append(nbf.v4.new_markdown_cell(
-r"""## 8. 🧠 Deep Neural Network Architecture in Apple MLX
-
-We construct a Deep Multi-Layer Perceptron (MLP) using Apple MLX's modular neural network APIs:
-- `mlx.nn.Linear`: Fully connected dense projections.
-- `mlx.nn.GELU`: Gaussian Error Linear Unit activation for smooth gradient flow.
-- `mlx.nn.Dropout`: Regularization to prevent overfitting on noisy sports data.
-- `mlx.nn.LayerNorm`: Normalizing activations across hidden layers."""
-    ))
-
-    cells.append(nbf.v4.new_code_cell(
-"""import mlx.core as mx
+y_test_np = test_df['home_win'].values.reshape(-1, 1).astype(np.float32)
+# %% [markdown]
+# ## 8. 🧠 Deep Neural Network Architecture in Apple MLX
+# 
+# We construct a Deep Multi-Layer Perceptron (MLP) using Apple MLX's modular neural network APIs:
+# - `mlx.nn.Linear`: Fully connected dense projections.
+# - `mlx.nn.GELU`: Gaussian Error Linear Unit activation for smooth gradient flow.
+# - `mlx.nn.Dropout`: Regularization to prevent overfitting on noisy sports data.
+# - `mlx.nn.LayerNorm`: Normalizing activations across hidden layers.
+# %%
+import mlx.core as mx
 import mlx.nn as nn
 
 # Model features
@@ -735,18 +667,13 @@ model = MLXNFLPredictor(input_dim=input_dim, hidden_dim=64, dropout_rate=0.2)
 mx.eval(model.parameters())
 
 print("✅ MLX NFL Predictor Neural Network instantiated successfully:")
-print(model)"""
-    ))
-
-    # Cell 10: MLX Training Loop
-    cells.append(nbf.v4.new_markdown_cell(
-r"""## 9. 🚀 Hardware-Accelerated MLX Training Loop
-
-Using `nn.value_and_grad`, MLX automatically computes forward pass loss and backward gradients in a unified computation graph, optimized for Apple Silicon Metal GPU execution."""
-    ))
-
-    cells.append(nbf.v4.new_code_cell(
-"""# Safety check: ensure MLX imports and MLXNFLPredictor are available
+print(model)
+# %% [markdown]
+# ## 9. 🚀 Hardware-Accelerated MLX Training Loop
+# 
+# Using `nn.value_and_grad`, MLX automatically computes forward pass loss and backward gradients in a unified computation graph, optimized for Apple Silicon Metal GPU execution.
+# %%
+# Safety check: ensure MLX imports and MLXNFLPredictor are available
 import time
 
 if 'mx' not in globals() or 'nn' not in globals():
@@ -895,16 +822,11 @@ for epoch in range(1, EPOCHS + 1):
 
 elapsed = time.time() - start_time
 print("-" * 65)
-print(f"✅ MLX Training finished in {elapsed:.2f} seconds ({elapsed/EPOCHS*1000:.2f} ms/epoch) on Apple Silicon GPU.")"""
-    ))
-
-    # Cell 11: Training Metrics Plots
-    cells.append(nbf.v4.new_markdown_cell(
-r"""## 10. 📈 Model Training Curves & Performance Convergence"""
-    ))
-
-    cells.append(nbf.v4.new_code_cell(
-"""# Safety fallback checks for visualization variables
+print(f"✅ MLX Training finished in {elapsed:.2f} seconds ({elapsed/EPOCHS*1000:.2f} ms/epoch) on Apple Silicon GPU.")
+# %% [markdown]
+# ## 10. 📈 Model Training Curves & Performance Convergence
+# %%
+# Safety fallback checks for visualization variables
 if 'plt' not in globals():
     import matplotlib.pyplot as plt
 
@@ -938,18 +860,13 @@ ax2.set_ylabel('Accuracy (%)')
 ax2.legend()
 
 plt.tight_layout()
-plt.show()"""
-    ))
-
-    # Cell 12: Comprehensive Out-of-Sample Model Evaluation
-    cells.append(nbf.v4.new_markdown_cell(
-r"""## 11. 🎯 Out-of-Sample Model Evaluation (2024–2026 Test Seasons)
-
-We evaluate our trained MLX model against Vegas Closing Lines and the Elo Rating model on unseen games."""
-    ))
-
-    cells.append(nbf.v4.new_code_cell(
-"""# Safety check: ensure MLX imports and MLXNFLPredictor are available
+plt.show()
+# %% [markdown]
+# ## 11. 🎯 Out-of-Sample Model Evaluation (2024–2026 Test Seasons)
+# 
+# We evaluate our trained MLX model against Vegas Closing Lines and the Elo Rating model on unseen games.
+# %%
+# Safety check: ensure MLX imports and MLXNFLPredictor are available
 if 'mx' not in globals() or 'nn' not in globals():
     import mlx.core as mx
     import mlx.nn as nn
@@ -1070,12 +987,9 @@ print("=" * 80)
 try:
     display(eval_df)
 except NameError:
-    print(eval_df)"""
-    ))
-
-    # Cell 13: ROC Curve & Confusion Matrix
-    cells.append(nbf.v4.new_code_cell(
-"""# Safety check: ensure dependencies and data for visualization
+    print(eval_df)
+# %%
+# Safety check: ensure dependencies and data for visualization
 if 'np' not in globals() or 'pd' not in globals():
     import numpy as np
     import pandas as pd
@@ -1122,24 +1036,19 @@ ax2.set_xlabel('Predicted Outcome')
 ax2.set_ylabel('Actual Outcome')
 
 plt.tight_layout()
-plt.show()"""
-    ))
-
-    # Cell 14: Betting Backtest & ROI Simulation
-    cells.append(nbf.v4.new_markdown_cell(
-r"""## 12. 💰 Real-Money Betting Simulation & +EV Backtesting
-
-### Expected Value (+EV) Strategy:
-A bet offers positive expected value ($+EV$) when the model's assessed probability of winning exceeds the implied probability of the sportsbook's decimal odds:
-$$\text{Expected Value (EV)} = P_{\text{model}} \times (\text{Decimal Odds} - 1) - (1 - P_{\text{model}})$$
-
-When $\text{EV} > \text{Threshold}$ (e.g., $3\%$), we place a bet. We simulate both:
-1. **Flat Staking**: $\$100$ bet per qualifying $+EV$ wager.
-2. **Fractional Kelly Criterion**: Bet size proportional to model edge: $f^* = \frac{P \times b - (1-P)}{b} \times \text{fraction}$."""
-    ))
-
-    cells.append(nbf.v4.new_code_cell(
-"""# Safety check: ensure dependencies and data for betting simulation
+plt.show()
+# %% [markdown]
+# ## 12. 💰 Real-Money Betting Simulation & +EV Backtesting
+# 
+# ### Expected Value (+EV) Strategy:
+# A bet offers positive expected value ($+EV$) when the model's assessed probability of winning exceeds the implied probability of the sportsbook's decimal odds:
+# $$\text{Expected Value (EV)} = P_{\text{model}} \times (\text{Decimal Odds} - 1) - (1 - P_{\text{model}})$$
+# 
+# When $\text{EV} > \text{Threshold}$ (e.g., $3\%$), we place a bet. We simulate both:
+# 1. **Flat Staking**: $\$100$ bet per qualifying $+EV$ wager.
+# 2. **Fractional Kelly Criterion**: Bet size proportional to model edge: $f^* = \frac{P \times b - (1-P)}{b} \times \text{fraction}$.
+# %%
+# Safety check: ensure dependencies and data for betting simulation
 if 'pd' not in globals() or 'np' not in globals():
     import pandas as pd
     import numpy as np
@@ -1242,18 +1151,13 @@ if len(bets_df) > 0:
     plt.legend()
     plt.show()
 else:
-    print("No bets qualified under the current edge threshold.")"""
-    ))
-
-    # Cell 15: Interactive Matchup Predictor Supporting All 32 NFL Teams
-    cells.append(nbf.v4.new_markdown_cell(
-r"""## 13. 🔮 Interactive All-Teams NFL Matchup Predictor & +EV Tool
-
-A plug-and-play prediction function allowing you to analyze any upcoming game between **any of the 32 NFL teams** by specifying team names or abbreviations, point spread, and moneyline odds."""
-    ))
-
-    cells.append(nbf.v4.new_code_cell(
-"""# Safety imports and definitions for interactive matchup prediction
+    print("No bets qualified under the current edge threshold.")
+# %% [markdown]
+# ## 13. 🔮 Interactive All-Teams NFL Matchup Predictor & +EV Tool
+# 
+# A plug-and-play prediction function allowing you to analyze any upcoming game between **any of the 32 NFL teams** by specifying team names or abbreviations, point spread, and moneyline odds.
+# %%
+# Safety imports and definitions for interactive matchup prediction
 import mlx.core as mx
 import pandas as pd
 from scipy.stats import norm
@@ -1349,7 +1253,7 @@ if 'SPREAD_SIGMA' not in globals():
 def predict_nfl_matchup(home_team, away_team, spread_line, total_line=44.5,
                         home_moneyline=None, away_moneyline=None,
                         model=None, scaler=None, elo_ratings=None, team_history=None):
-    \"\"\"
+    """
     Generates real-time game win probabilities and betting recommendations for ANY of the 32 NFL teams.
     
     Parameters:
@@ -1359,7 +1263,7 @@ def predict_nfl_matchup(home_team, away_team, spread_line, total_line=44.5,
     - total_line (float): Over/Under points total line (default: 44.5)
     - home_moneyline (float): American moneyline odds for home team (e.g. -160)
     - away_moneyline (float): American moneyline odds for away team (e.g. +140)
-    \"\"\"
+    """
     h_code = normalize_team(home_team)
     a_code = normalize_team(away_team)
     
@@ -1466,38 +1370,23 @@ predict_nfl_matchup(
     away_moneyline=+135
 )
 
-print("\\nMatchup Demonstration 2 (NFC Heavyweights):")
+print("\nMatchup Demonstration 2 (NFC Heavyweights):")
 predict_nfl_matchup(
-    home_team='49ers',
-    away_team='Eagles',
+    home_team='Rams',
+    away_team='Giants',
     spread_line=-2.5,
     total_line=46.0,
     home_moneyline=-130,
     away_moneyline=+110
-)"""
-    ))
-
-    # Cell 16: Conclusion & Key Takeaways
-    cells.append(nbf.v4.new_markdown_cell(
-r"""## 14. 📝 Key Takeaways & Conclusions
-
-1. **Complete 32-Team NFL Coverage**:
-   - Every active franchise in the AFC and NFC is represented with continuous dynamic Elo tracking and historical continuity through franchise relocations.
-2. **Apple MLX Acceleration**:
-   - Running deep learning pipelines directly on Apple Silicon unified memory eliminates CPU-to-GPU memory copy overhead.
-   - Fast gradient compilation with `nn.value_and_grad` delivers rapid training and inference.
-3. **Betting Market Wisdom**:
-   - Vegas closing lines represent an ultra-competitive information baseline. By combining market de-vigged implied probabilities with dynamic Elo ratings and rolling team efficiency features, the MLX Neural Network captures non-linear edges and profitable +EV betting opportunities."""
-    ))
-
-    nb.cells = cells
-    return nb
-
-if __name__ == '__main__':
-    notebook = build_nfl_mlx_notebook()
-    output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'notebooks')
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, 'nfl_prediction_mlx.ipynb')
-    with open(output_path, 'w', encoding='utf-8') as f:
-        nbf.write(notebook, f)
-    print(f"Wrote notebook to {output_path}")
+)
+# %% [markdown]
+# ## 14. 📝 Key Takeaways & Conclusions
+# 
+# 1. **Complete 32-Team NFL Coverage**:
+#    - Every active franchise in the AFC and NFC is represented with continuous dynamic Elo tracking and historical continuity through franchise relocations.
+# 2. **Apple MLX Acceleration**:
+#    - Running deep learning pipelines directly on Apple Silicon unified memory eliminates CPU-to-GPU memory copy overhead.
+#    - Fast gradient compilation with `nn.value_and_grad` delivers rapid training and inference.
+# 3. **Betting Market Wisdom**:
+#    - Vegas closing lines represent an ultra-competitive information baseline. By combining market de-vigged implied probabilities with dynamic Elo ratings and rolling team efficiency features, the MLX Neural Network captures non-linear edges and profitable +EV betting opportunities.
+# %%
